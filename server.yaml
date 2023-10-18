@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: service
+metadata:
+  name: mysecret
+type: Opaque 
+data:
+  ROOT_PASSWORD: “paste the output value” (encrypted value generated in 2nd step) 
+
