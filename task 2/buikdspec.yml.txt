@@ -1,0 +1,48 @@
+version: 0.2  
+env: 
+  secrets-manager:
+    username: testing/sonar:username
+    token: testing/sonar:token
+    access_key: testing/sonar:access_key
+    secret_key: testing/sonar:secret_access
+phases:
+  pre_build:
+    commands:
+      - echo installing dependencies
+      - chmod +x ./scripts/awscli.sh
+      - chmod +x ./scripts/eksctl.sh
+      - chmod +x ./scripts/kubectl.sh
+      - ./scripts/awscli.sh
+      - ./scripts/eksctl.sh
+      - ./scripts/kubectl.sh
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 185633157927.dkr.ecr.ap-south-1.amazonaws.com
+  build:
+    commands:
+      - echo Building Docker image...
+      - docker login -u $username -p $token
+      - echo login success
+      - docker build -t varthana1 .
+  post_build:
+    commands:
+      - echo Pushing Docker image to Amazon ECR...
+      - docker tag varthana1:latest 185633157927.dkr.ecr.ap-south-1.amazonaws.com/varthana:latest
+      - docker push 185633157927.dkr.ecr.ap-south-1.amazonaws.com/varthana:latest
+      - echo updating kubeconfig 
+      - CREDENTIALS=$(aws sts assume-role --role-arn "$EKS" --role-session-name codebuild-kubectl --duration-seconds 900)
+      - export AWS_ACCESS_KEY_ID="$(echo ${CREDENTIALS} | jq -r '.Credentials.AccessKeyId')"
+      - export AWS_SECRET_ACCESS_KEY="$(echo ${CREDENTIALS} | jq -r '.Credentials.SecretAccessKey')"
+      - export AWS_SESSION_TOKEN="$(echo ${CREDENTIALS} | jq -r '.Credentials.SessionToken')"
+      - export AWS_EXPIRATION=$(echo ${CREDENTIALS} | jq -r '.Credentials.Expiration')
+      # - export AWS_ACCESS_KEY_ID=S{access_key}
+      # - export AWS_SECRET_ACCESS_KEY=${secret_key}
+      # Setup kubectl with our EKS Cluster            
+      - echo "Update Kube Config"      
+      - aws eks update-kubeconfig --name $EKS_CLUSTER_NAME
+      # Apply changes to our Application using kubectl
+      - echo "Apply changes to kube manifests"
+      - chmod +x springboot.yaml               
+      - kubectl apply -f springboot.yaml
+      - chmod +x ./scripts/helm.sh
+      - ./scripts/helm.sh
+

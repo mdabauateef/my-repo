@@ -1,0 +1,9 @@
+resources
+
+https://www.stacksimplify.com/aws-eks/aws-devops-eks/learn-to-master-devops-on-aws-eks-using-aws-codecommit-codebuild-codepipeline/
+
+https://blog.devops.dev/automate-spring-boot-app-with-jenkins-pipeline-using-amazon-ecr-and-eks-a09a7af0d866
+
+https://www.coachdevops.com/2022/01/deploy-springboot-microservices-app_11.html#google_vignette
+
+https://secrets-store-csi-driver.sigs.k8s.io/getting-started/usage.html
