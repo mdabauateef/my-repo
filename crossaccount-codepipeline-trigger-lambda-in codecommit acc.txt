@@ -1,0 +1,270 @@
+--------------------
+code commit account:
+--------------------
+
+lambda fuction will be created in code commit account:
+
+In lambda triggers add code commit repository
+
+import boto3
+import json
+import botocore.exceptions
+
+def lambda_handler(event, context):
+    # Create a client object for the STS service
+    sts_client = boto3.client('sts')
+    
+    # Assume the IAM role in the other AWS account
+    role_arn = 'arn:aws:iam::114524529325:role/cross-account-lambda-role'
+    assumed_role = sts_client.assume_role(
+        RoleArn=role_arn,
+        RoleSessionName='AssumeRoleSession1'
+    )
+    
+    # Use the temporary security credentials to call the CodePipeline service
+    pipeline_client = boto3.client(
+        'codepipeline',
+        aws_access_key_id=assumed_role['Credentials']['AccessKeyId'],
+        aws_secret_access_key=assumed_role['Credentials']['SecretAccessKey'],
+        aws_session_token=assumed_role['Credentials']['SessionToken']
+    )
+    
+    try:
+        # Call the StartPipelineExecution API with the necessary parameters
+        response = pipeline_client.start_pipeline_execution(
+            name='cms-production-pipeline'
+        )
+    except botocore.exceptions.ClientError as e:
+        error_message = e.response['Error']['Message']
+        print(f"Error message: {error_message}")
+        # Handle the error as needed
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': error_message})
+        }
+    
+    # Print the response
+    print(response)
+    
+    return {
+        'statusCode': 200,
+        'body': json.dumps({'message': 'Pipeline execution started successfully'})
+    }
+
+
+
+
+
+plocilies to attach lambda function role:
+
+cross-account-lambda:
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "codepipeline:StartPipelineExecution"
+            ],
+            "Resource": "arn:aws:codepipeline:ap-south-1:114524529325:*"      //codepipeline account ID
+        }
+    ]
+}
+
+cross-account-lambda-policy
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AssumeRolePermission",
+            "Effect": "Allow",
+            "Action": "sts:AssumeRole",
+            "Resource": "arn:aws:iam::114524529325:role/cross-account-lambda-role"     //cross-account-lambda-role is created in code pipeline account that role arn has to give
+        }
+    ]
+}
+
+
+Trust relationship:
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "lambda.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+}
+------------------
+create one role:
+This role arn must be added while updating the pipeline in json under runrole
+To create this role first create s3 bucket and kms in code pipeline account
+mention s3 bucket arn and kms arn in this role
+
+role :cross-acc-access
+
+cross-acc-access-policy
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject*",
+                "s3:PutObject",
+                "s3:PutObjectAcl",
+                "codecommit:ListBranches",
+                "codecommit:ListRepositories"
+            ],
+            "Resource": [
+                "arn:aws:s3:::cross-region-account/*"                  //bucket arn which we created in the codepipeline account
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "kms:DescribeKey",
+                "kms:GenerateDataKey*",
+                "kms:Encrypt",
+                "kms:ReEncrypt*",
+                "kms:Decrypt"
+            ],
+            "Resource": [
+                "arn:aws:kms:ap-south-1:114524529325:key/56e3c6c9-c789-4c13-b3fe-60710135db71"          //kms key created in the codepipeline account that arn
+            ]
+        }
+    ]
+}
+
+code commit full access policy
+------------------------------
+In codepipeline account:
+------------------------------
+
+policy to attach in codepipeline role:
+
+{
+    "Version": "2012-10-17",
+    "Statement": {
+        "Effect": "Allow",
+        "Action": "sts:AssumeRole",
+        "Resource": [
+            "arn:aws:iam::884935716134:role/*"
+        ]
+    }
+}
+
+trust realtion ship:
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "codepipeline.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+}
+
+
+
+cross-account-lambda-role:   //code pipeline account
+
+This role arn  will be given in lambda function which is in code commit
+
+cross-account-lambda-pipelineaccess
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "CodePipelineStartPipelineExecution",
+            "Effect": "Allow",
+            "Action": "codepipeline:StartPipelineExecution",
+            "Resource": "arn:aws:codepipeline:ap-south-1:114524529325:*"
+        }
+    ]
+}
+
+crossaccount-lambda
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "lambda:InvokeFunction"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+
+Trust relationship:
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::884935716134:root"    //code commit account
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+}
+
+create one kms (cross account key)  add user and pipeline roles in that 
+create s3 bucket cross-region-account
+In this bucket copy the policy
+
+{
+    "Version": "2012-10-17",
+    "Id": "Policy1591079668806",
+    "Statement": [
+        {
+            "Sid": "",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::884935716134:root"          //code commit accountID
+            },
+            "Action": [
+                "s3:Get*",
+                "s3:Put*"
+            ],
+            "Resource": "arn:aws:s3:::cross-region-account/*"      //bucket name
+        },
+        {
+            "Sid": "",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::884935716134:root"           //code commit account ID
+            },
+            "Action": "s3:ListBucket",
+            "Resource": "arn:aws:s3:::cross-region-account"       //bucket name
+        }
+    ]
+}
+
+
+
+aws codepipeline get-pipeline --name cms-api-production-pipeline > cms-api-production.json
+aws codepipeline update-pipeline --cli-input-json file://cross-acc-pipeline-new.json
+
+cross-acc-pipeline-new.json
+
+
+is this Cross-account actions or scenario possible for jenkins ? NO
+How you connect kms key to another account? by adding the accunt ID in kms 
