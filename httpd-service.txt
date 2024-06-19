@@ -1,0 +1,22 @@
+---
+ - name: Installing HTTPD
+   hosts: all
+   become: true
+   gather_facts: false     #information of remote users
+   vars:
+     pkg: httpd
+   tasks:
+     - shell: rpm -q httpd | head -n 1     #exec cmd
+       register: result
+     - set_fact:   
+        result: "{{ result.stdout }}"
+     - debug:
+        msg: "Is the {{ pkg }} installed: {{ result }}"
+     - yum:
+        name: "{{ pkg }}"
+        state: latest
+       when: result | regex_search("not installed")
+     - name: ensure apache is running
+       service:
+          name: httpd
+          state: started

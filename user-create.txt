@@ -1,0 +1,31 @@
+---
+- name: Using the copy module
+  hosts: all
+  become: yes
+  tasks:
+    - name: Create dev group
+      group:
+        name: dev
+        state: present
+
+    - name: Create pavan user
+      user:
+        name: pavan
+        group: dev
+        #state: absent
+        #remove: yes
+        #force: yes
+
+    - name: Create sunil user
+      user:
+        name: sunil
+        group: dev
+
+    - name: Give sudo access to users
+      blockinfile:                  #inserting a blockof lines we give path,before after,
+        path: /etc/sudoers
+        insertafter: 'root    ALL=(ALL)       ALL'
+        block: |
+          # Give access to users
+          pavan        ALL=(ALL)       NOPASSWD: ALL
+          sunil        ALL=(ALL)       NOPASSWD: ALL
